@@ -3,43 +3,53 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-$(document).ready(async function () {
-  try {
-    // Detectar los campos de ambas tablas
-    const { data: productos, error: errorProd } = await supabase.from('productos').select('*');
-    if (errorProd) throw errorProd;
+// Función principal para cargar productos visibles
+async function cargarProductos() {
+  const { data: productos, error } = await supabase
+    .from('productos')
+    .select(`
+      id,
+      marca,
+      modelo,
+      precio,
+      genero,
+      descripcion,
+      visible,
+      imagenes_productos (
+        url,
+        orden
+      )
+    `)
+    .eq('visible', true)
+    .order('id', { ascending: false });
 
-    const { data: imagenes, error: errorImg } = await supabase.from('imagenes').select('*');
-    if (errorImg) throw errorImg;
+  if (error) {
+    console.error('Error al obtener productos:', error.message);
+    return;
+  }
 
-    const grid = $('#productosGrid');
-    grid.empty();
+  const contenedor = document.getElementById('productos');
+  contenedor.innerHTML = '';
 
-    productos.forEach(producto => {
-      // Buscar imagen correspondiente al producto
-      const imagen = imagenes.find(img => img.producto_id === producto.id);
-      const imgUrl = imagen ? imagen.url : '';
+  productos.forEach(producto => {
+    const imagenPrincipal = producto.imagenes_productos?.sort((a, b) => a.orden - b.orden)[0]?.url 
+                            || 'https://via.placeholder.com/400x300?text=Sin+imagen';
 
-      const nombreCompleto = `${producto.marca} ${producto.modelo}`;
-      const precioFormateado = `$${parseFloat(producto.precio).toFixed(2)}`;
-
-      const card = `
-        <div class="col-sm-6 col-md-4 col-lg-3">
-          <div class="card h-100 shadow-sm">
-            <img src="${imgUrl}" class="card-img-top" alt="${nombreCompleto}" style="object-fit: cover; height: 200px;">
-            <div class="card-body d-flex flex-column">
-              <h5 class="card-title">${nombreCompleto}</h5>
-              <p class="card-text small">${producto.descripcion}</p>
-              <p class="fw-bold text-primary">${precioFormateado}</p>
-              <button class="btn btn-dark mt-auto">Ver más</button>
-            </div>
+    const card = `
+      <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+          <img src="${imagenPrincipal}" class="card-img-top" alt="${producto.modelo}">
+          <div class="card-body d-flex flex-column">
+            <h5 class="card-title">${producto.marca} - ${producto.modelo}</h5>
+            <p class="card-text">${producto.descripcion}</p>
+            <p class="mt-auto fw-bold">$${producto.precio}</p>
+            <a href="/producto/${producto.id}" class="btn btn-primary mt-2">Ver más</a>
           </div>
         </div>
-      `;
-      grid.append(card);
-    });
+      </div>
+    `;
+    contenedor.innerHTML += card;
+  });
+}
 
-  } catch (error) {
-    console.error('Error al cargar productos e imágenes:', error.message);
-  }
-});
+document.addEventListener('DOMContentLoaded', cargarProductos);
